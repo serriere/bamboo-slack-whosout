@@ -2,6 +2,7 @@ import json
 import logging
 import base64
 import datetime
+import os
 
 from urllib2 import Request, urlopen, URLError, HTTPError
 from datetime import datetime
@@ -15,22 +16,22 @@ logger.setLevel(logging.INFO)
 #
 
 # The domain of your BambooHR account (uk or us)
-BAMBOO_DOMAIN = "uk"
+BAMBOO_DOMAIN = os.environ["bambooHRDomain"]
 
 # Your BambooHR account name (the first part of your BambooHR url)
-BAMBOO_ACCOUNT = "REDACTED"
+BAMBOO_ACCOUNT = os.environ["bambooHRAccount"]
 
 # Your BambooHR API Key - note that if you use a personal API key generated from the
 # BambooHR API and then run this code on AWS you are exposing all of the BambooHR data
 # you can access to anybody who can view your Lambda code! Contact BambooHR support
 # to get a specific API key for this purpose.
-BAMBOO_API_KEY = "REDACTED"
+BAMBOO_API_KEY = os.environ["bambooHRAPIKey"]
 
 # The incoming slack webhook to send messages to
-SLACK_WEB_HOOK = "REDACTED"
+SLACK_WEB_HOOK = os.environ["slackWebHook"]
 
 # The slack channel to send messages to
-SLACK_CHANNEL = "general"
+SLACK_CHANNEL = os.environ["slackChannel"]
 
 # Do not modify below here
 
@@ -42,19 +43,19 @@ bamboodomains = {
 }
 
 def whosout(today):
-  out = []  
+  out = []
   bamboorequest = Request("https://{0}/api/gateway.php/{1}/v1/time_off/whos_out/?filter=off&end={2}".format(bamboodomains[BAMBOO_DOMAIN], BAMBOO_ACCOUNT, today.strftime("%Y-%m-%d")))
 
   bamboorequest.add_header("Authorization", "Basic %s" % base64string)
   bamboorequest.add_header("Accept", "application/json")
   try:
     result = urlopen(bamboorequest)
-    return json.loads(result.read())   
+    return json.loads(result.read())
   except HTTPError as e:
     logger.error("Request failed: %d %s", e.code, e.reason)
   except URLError as e:
     logger.error("Server connection failed: %s", e.reason)
-  return names
+  return
 
 def posttoslack(text):
   slack_message = {
@@ -96,7 +97,7 @@ def lambda_handler(event, context):
         names.append(who.get("name"))
 
     if names:
-      text = "*Who's out today:* \n{}".format('\n'.join(names))
+      text = "*Who's on PTO today:* \n{}".format('\n'.join(names))
       posttoslack(text)
   else:
     posttoslack("Nobody is out today! :tada:")
