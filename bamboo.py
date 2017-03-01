@@ -3,6 +3,7 @@ import logging
 import base64
 import datetime
 import os
+import urllib2
 
 from urllib2 import Request, urlopen, URLError, HTTPError
 from datetime import datetime
@@ -44,9 +45,19 @@ bamboodomains = {
 
 def whosout(today):
   out = []
-  bamboorequest = Request("https://{0}/api/gateway.php/{1}/v1/time_off/whos_out/?filter=off&end={2}".format(bamboodomains[BAMBOO_DOMAIN], BAMBOO_ACCOUNT, today.strftime("%Y-%m-%d")))
 
-  bamboorequest.add_header("Authorization", "Basic %s" % base64string)
+  gh_url = "https://{0}/api/gateway.php/{1}/v1/time_off/whos_out/?filter=off&end={2}".format(bamboodomains[BAMBOO_DOMAIN], BAMBOO_ACCOUNT, today.strftime("%Y-%m-%d"))
+
+  bamboorequest = Request(gh_url)
+
+  password_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+  password_manager.add_password(None, gh_url, BAMBOO_API_KEY, 'pass')
+
+  auth_manager = urllib2.HTTPBasicAuthHandler(password_manager)
+  opener = urllib2.build_opener(auth_manager)
+
+  urllib2.install_opener(opener)
+
   bamboorequest.add_header("Accept", "application/json")
   try:
     result = urlopen(bamboorequest)
@@ -66,7 +77,7 @@ def posttoslack(text):
         "mrkdwn_in": ["text"],
         "username": "bamboo-bot",
         "fields": [],
-        "color": "#F3F300"
+        "color": "#8ac53e"
       }
     ],
     "channel": SLACK_CHANNEL
@@ -93,6 +104,7 @@ def lambda_handler(event, context):
     for who in out:
       if who.get("type") == "holiday":
         posttoslack("*Today is:* {} :confetti_ball:".format(who.get("name")))
+        return
       else:
         names.append(who.get("name"))
 
@@ -100,4 +112,4 @@ def lambda_handler(event, context):
       text = "*Who's on PTO today:* \n{}".format('\n'.join(names))
       posttoslack(text)
   else:
-    posttoslack("Nobody is out today! :tada:")
+    posttoslack("Nobody has scheduled PTO today! :tada:")
